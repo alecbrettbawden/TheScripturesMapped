@@ -1,6 +1,6 @@
 /*============================================================================
  * FILE:    scriptures.js
- * AUTHOR:  Stephen W. Liddle
+ * AUTHOR:  Alec Bawden
  * DATE:    Winter 2020
  *
  * DESCRIPTION: Front-end JavaScript code for The Scriptures, Mapped.
@@ -26,6 +26,7 @@
 /*------------------------------------------------------------------------
  *                      CONSTANTS
  */
+const ANIMATION_DURATION = 700;
 const BOTTOM_PADDING = "<br /><br />";
 const CLASS_BOOKS = "books";
 const CLASS_BUTTON = "btn";
@@ -34,7 +35,8 @@ const CLASS_ICON = "material-icons";
 const CLASS_VOLUME = "volume";
 const DIV_BREADCRUMBS = "crumbs";
 const DIV_SCRIPTURES_NAVIGATOR = "scripnav";
-const DIV_SCRIPTURES = "scriptures";
+const DIV_SCRIPTURES1 = "scripdiv1";
+const DIV_SCRIPTURES2 = "scripdiv2";
 const ICON_NEXT = "skip_next";
 const ICON_PREVIOUS = "skip_previous";
 const INDEX_LATITUDE = 3;
@@ -62,10 +64,16 @@ let books;
 let gmLabels = [];
 let gmMarkers = [];
 let initializedMapLabel = false;
+let offScreenDiv;
+let onScreenDiv;
 let requestedBreadcrumbs;
 let requestedNextPrevious;
 let retryDelay = 500;
 let volumes;
+let forwardChapter;
+let currentChapter;
+let currentBookId;
+let newHierarchy;
 
 /*------------------------------------------------------------------------
  *                      PRIVATE METHODS
@@ -261,7 +269,50 @@ const encodedScripturesUrlParameters = function (bookId, chapter, verses, isJst)
 };
 
 const getScripturesCallback = function (chapterHtml) {
-    document.getElementById(DIV_SCRIPTURES).innerHTML = chapterHtml;
+    offScreenDiv.innerHTML = chapterHtml;
+
+    const width = $(offScreenDiv).width();
+
+    if (newHierarchy) {
+        $(offScreenDiv).css("left", 0)
+        $(offScreenDiv).fadeIn(ANIMATION_DURATION);
+        $(onScreenDiv).fadeOut(ANIMATION_DURATION);
+
+        const temp = onScreenDiv;
+        onScreenDiv = offScreenDiv;
+        offScreenDiv = temp;
+
+        $(onScreenDiv).css({"z-index": 1, "display": "block"});
+        $(offScreenDiv).css("z-index", 0);
+    } else {
+        if (forwardChapter) {
+
+            $(offScreenDiv).css("left", width);
+            $(offScreenDiv).animate({left: `-=${width}`}, ANIMATION_DURATION);
+            $(onScreenDiv).animate({left: `-=${width}`}, ANIMATION_DURATION);
+
+            const temp = onScreenDiv;
+            onScreenDiv = offScreenDiv;
+            offScreenDiv = temp;
+
+            $(onScreenDiv).css({"z-index": 1, "display": "block"});
+            $(offScreenDiv).css("z-index", 0);
+
+        } else {
+
+            $(offScreenDiv).css("left", -width);
+            $(offScreenDiv).animate({left: `+=${width}`}, ANIMATION_DURATION);
+            $(onScreenDiv).animate({left: `+=${width}`}, ANIMATION_DURATION);
+
+            const temp = onScreenDiv;
+            onScreenDiv = offScreenDiv;
+            offScreenDiv = temp;
+
+            $(onScreenDiv).css({"z-index": 1, "display": "block"});
+            $(offScreenDiv).css("z-index", 0);
+        }
+    }
+
     document.querySelectorAll(".navheading").forEach(function (element) {
         element.appendChild(parseHtml(`<div class="nextprev">${requestedNextPrevious}</div>`)[0]);
     });
@@ -355,6 +406,9 @@ const htmlLink = function (parameters) {
 const init = function (onInitializedCallback) {
     let booksLoaded = false;
     let volumesLoaded = false;
+
+    onScreenDiv = document.getElementById(DIV_SCRIPTURES1)
+    offScreenDiv = document.getElementById(DIV_SCRIPTURES2)
 
     fetch(URL_BOOKS).then(function (response) {
         if (response.ok) {
@@ -450,6 +504,30 @@ const navigateChapter = function (bookId, chapter) {
 
         requestedBreadcrumbs = breadcrumbs(volume, book, chapter);
 
+        if (bookId === currentBookId ) {
+            if (chapter < currentChapter) {
+                newHierarchy = false;
+                forwardChapter = false;
+                currentChapter = chapter;
+            } else {
+                newHierarchy = false;
+                forwardChapter = true;
+                currentChapter = chapter;
+            }
+        } else if (bookId > currentBookId) {
+            newHierarchy = true;
+            currentChapter = chapter;
+            currentBookId = bookId;
+        } else if (bookId < currentBookId) {
+            newHierarchy = true;
+            currentChapter = chapter;
+            currentBookId = bookId;
+        } else {
+            newHierarchy = true;
+            currentChapter = chapter;
+            currentBookId = bookId;
+        }
+
         let nextPrev = previousChapter(bookId, chapter);
 
         if (nextPrev === undefined) {
@@ -459,7 +537,7 @@ const navigateChapter = function (bookId, chapter) {
         }
 
         nextPrev = nextChapter(bookId, chapter);
-
+        
         if (nextPrev !== undefined) {
             requestedNextPrevious += nextPreviousMarkup(nextPrev, ICON_NEXT);
         }
@@ -477,7 +555,7 @@ const navigateChapter = function (bookId, chapter) {
 };
 
 const navigateHome = function (volumeId) {
-    document.getElementById(DIV_SCRIPTURES).innerHTML = htmlDiv({
+    onScreenDiv.innerHTML = htmlDiv({
         id: DIV_SCRIPTURES_NAVIGATOR,
         content: volumesGridContent(volumeId)
     });
@@ -490,7 +568,6 @@ const navigateHome = function (volumeId) {
 // Otherwise returns an array with the next book ID, chapter, and title
 const nextChapter = function (bookId, chapter) {
     let book = books[bookId];
-
     if (book !== undefined) {
         if (chapter < book.numChapters) {
             return [
@@ -530,6 +607,10 @@ const nextPreviousMarkup = function (nextPrev, icon) {
 // where each of the three parameters is optional.
 const onHashChanged = function () {
     let ids = [];
+
+    if (gmMarkers.length > 0) {
+        clearMarkers();
+    }
 
     if (location.hash !== "" && location.hash.length > 1) {
         ids = location.hash.slice(1).split(":");
@@ -579,7 +660,6 @@ const parseHtml = function (html) {
 // Otherwise returns an array with the next book ID, chapter, and title
 const previousChapter = function (bookId, chapter) {
     let book = books[bookId];
-
     if (book !== undefined) {
         if (chapter > 1) {
             return [bookId, chapter - 1, titleForBookChapter(book, chapter - 1)];
@@ -679,7 +759,7 @@ const transitionBreadcrumbs = function (newCrumbs) {
 };
 
 const transitionScriptures = function (newContent) {
-    document.getElementById(DIV_SCRIPTURES).innerHTML = htmlDiv({content: newContent});
+    onScreenDiv.innerHTML = htmlDiv({content: newContent});
     setupMarkers(newContent);
 };
 

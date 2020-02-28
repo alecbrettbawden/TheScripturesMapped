@@ -88,6 +88,23 @@ div.subtitle {
     position: relative;
 }
 
+#scripdiv1, #scripdiv2 {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+}
+
+#scripdiv1 {
+    z-index: 1;
+}
+
+#scripdiv2 {
+    z-index: 0;
+}
+
+
 #scripnav {
     position: absolute;
     max-height: 100%;
@@ -98,6 +115,7 @@ div.subtitle {
 
 #map {
     flex: 1 1 70%;
+    z-index: 100000;
 }
 
 .volume {
