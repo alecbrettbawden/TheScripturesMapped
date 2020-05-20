@@ -274,9 +274,9 @@ const getScripturesCallback = function (chapterHtml) {
     const width = $(offScreenDiv).width();
 
     if (newHierarchy) {
-        $(offScreenDiv).css("left", 0)
-        $(offScreenDiv).fadeIn(ANIMATION_DURATION);
+        $(offScreenDiv).css("left", 0);
         $(onScreenDiv).fadeOut(ANIMATION_DURATION);
+        $(offScreenDiv).fadeIn(ANIMATION_DURATION);
 
         const temp = onScreenDiv;
         onScreenDiv = offScreenDiv;
@@ -482,6 +482,7 @@ const navigateBook = function (bookId) {
     let book = books[bookId];
     let volume;
 
+    $(onScreenDiv).fadeIn(ANIMATION_DURATION);
     if (book.numChapters <= 1) {
         navigateChapter(book.id, book.numChapters);
     } else {
@@ -495,6 +496,7 @@ const navigateBook = function (bookId) {
         }));
         transitionBreadcrumbs(breadcrumbs(volume, book));
     }
+
 };
 
 const navigateChapter = function (bookId, chapter) {
@@ -560,6 +562,8 @@ const navigateHome = function (volumeId) {
         content: volumesGridContent(volumeId)
     });
 
+    $(onScreenDiv).fadeIn(ANIMATION_DURATION);
+
     document.getElementById(DIV_BREADCRUMBS).innerHTML = breadcrumbs(volumeForId(volumeId));
 };
 
@@ -617,22 +621,27 @@ const onHashChanged = function () {
     }
 
     if (ids.length <= 0) {
+        $(onScreenDiv).css("display", "none");
         navigateHome();
     } else if (ids.length === 1) {
         let volumeId = Number(ids[0]);
 
         if (volumeId < volumes[0].id || volumeId > volumes.slice(-1).id) {
+            $(onScreenDiv).css("display", "none");
             navigateHome();
         } else {
+            $(onScreenDiv).css("display", "none");
             navigateHome(volumeId);
         }
     } else if (ids.length >= 2) {
         let bookId = Number(ids[1]);
 
         if (books[bookId] === undefined) {
+            $(onScreenDiv).css("display", "none");
             navigateHome();
         } else {
             if (ids.length === 2) {
+                $(onScreenDiv).css("display", "none");
                 navigateBook(bookId);
             } else {
                 let chapter = Number(ids[2]);
@@ -640,6 +649,7 @@ const onHashChanged = function () {
                 if (bookChapterValid(bookId, chapter)) {
                     navigateChapter(bookId, chapter);
                 } else {
+                    $(onScreenDiv).css("display", "none");
                     navigateHome();
                 }
             }
